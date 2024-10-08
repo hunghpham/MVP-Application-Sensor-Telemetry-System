@@ -1,0 +1,3 @@
+Post_URL = http://localhost:8082/v3/clusters/mjRsA5jDTLCSAMIbV1mGJQ/topics/hung_thanh_alina/records
+Number_Of_Sensor = 5
+Serial_Start_With = ABCD
