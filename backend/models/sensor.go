@@ -1,22 +1,11 @@
 package models
 
-import (
-    "time"
-)
 
-type Sensor struct {
-    Serial      string      `binding: required`
-    DateTime    time.Time
-    Value       float64     `binding: required`
+type SensorData struct {
+	Serial    string  `json:"Serial"`
+	Type      string  `json:"Type"`
+	Timestamp string  `json:"Timestamp"`
+	Reading1  float64 `json:"Reading1"`
+	Reading2  float64 `json:"Reading2"`
 }
 
-var sensors = []Sensor{}
-
-func (s Sensor) Save() {
-    //Later add it to the database
-    sensors = append(sensors, s)
-}
-
-func GetAllSensors() []Sensor {
-    return sensors
-}

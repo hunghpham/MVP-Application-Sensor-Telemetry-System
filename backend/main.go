@@ -2,23 +2,31 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
 
-	//"encoding/json"
 	//"bytes"
 
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/questdb/go-questdb-client/v3"
 	"github.com/segmentio/kafka-go"
 	"github.com/tidwall/gjson"
-
-	//	"github.com/questdb/go-questdb-client/v3"
-	"mesa.com/backend/models"
 )
+
+type SensorData struct {
+	Serial    string  `json:"Serial"`
+	Type      string  `json:"Type"`
+	Timestamp string  `json:"Timestamp"`
+	Reading1  float64 `json:"Reading1"`
+	Reading2  float64 `json:"Reading2"`
+}
 
 func main() {
 
@@ -35,32 +43,47 @@ func main() {
 
 // /////////////// Database related functions /////////////////////
 // Get all current sensors
-func getAllSensors(context *gin.Context) {
-	sensors := models.GetAllSensors()
-	context.JSON(http.StatusOK, sensors)
+func getAllSensors(ctx *gin.Context) {
+
+	// Define the SQL query
+	query := `
+			SELECT serial_number, timestamp, sensor_type, reading1, reading2
+			FROM sensor_historical_data
+			LATEST BY serial_number;
+			`
+
+	u, err := url.Parse("http://localhost:9000")
+	if err != nil {
+		log.Println("Parse URL error: " + err.Error())
+	}
+
+	u.Path += "exec"
+	params := url.Values{}
+	params.Add("query", query)
+	u.RawQuery = params.Encode()
+	url := fmt.Sprintf("%v", u)
+
+	res, err := http.Get(url)
+	if err != nil {
+		log.Println("Query through QUESTDB Rest API error: " + err.Error())
+	}
+
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		log.Println("Read response body error: " + err.Error())
+	}
+
+	log.Println(string(body))
+
+	ctx.JSON(http.StatusCreated, gin.H{"message": "OK"})
 
 }
 
 // Get individual sensor historical data based on datetime range
 func getHistoricalData(context *gin.Context) {
-
-}
-
-func createSensorRecord(context *gin.Context) {
-	var sensor models.Sensor
-	err := context.ShouldBindJSON(&sensor)
-
-	if err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not create sensor!"})
-		return
-	}
-
-	sensor.Serial = "9988"
-	sensor.DateTime = time.Now().UTC()
-	sensor.Value = 25.7
-	sensor.Save()
-
-	context.JSON(http.StatusCreated, gin.H{"message": "Sensor Created", "Sensor": sensor})
+	context.JSON(http.StatusCreated, gin.H{"message": "OK"})
 }
 
 // //////////////// Other helper functions
@@ -138,47 +161,6 @@ func create_kafka_topic_and_subscribe(context *gin.Context) {
 	//Return messages to user
 	context.JSON(http.StatusOK, gin.H{"Status": "OK", "Kafka_Endpoint": new_url + "/" + topic + "/records"})
 
-	//     // Create the data structure to send in the POST request body, using REST API proxy here, works as well
-	//     data := map[string]string {
-	// 		"topic_name": string(topic),
-	// 	}
-	//
-	//     // Convert the data to JSON
-	// 	jsonData, err := json.Marshal(data)
-	// 	if err != nil {
-	// 		context.JSON(http.StatusOK, gin.H{"Status": "Server error, encoding JSON failed.", "Error": err.Error()})
-	// 		return
-	// 	}
-	//
-	//     // Create a new POST request with JSON data
-	//     url = url + "/" + cluster_id + "/topics"
-	// 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	// 	if err != nil {
-	// 		context.JSON(http.StatusOK, gin.H{"Status": "Server error, creating request failed.", "Error": err.Error()})
-	// 		return
-	// 	}
-	//
-	//     // Set the appropriate headers
-	// 	req.Header.Set("Content-Type", "application/json")
-	//
-	//     // Send the POST request
-	// 	client := &http.Client{}
-	// 	resp, err := client.Do(req)
-	// 	if err != nil {
-	// 		context.JSON(http.StatusOK, gin.H{"Status": "Server error, sending request failed.", "Error": err.Error()})
-	// 		return
-	// 	}
-	// 	defer resp.Body.Close()
-	//
-	// 	// Check the response status
-	// 	if resp.StatusCode == http.StatusOK {
-	// 		context.JSON(http.StatusOK, gin.H{"Status": "OK", "Post_endpoint": url + "/" + topic + "/records"})
-	// 		return
-	// 	} else {
-	// 		context.JSON(http.StatusOK, gin.H{"Status": "Server error, sending request failed.", "Error": err.Error()})
-	// 		return
-	// 	}
-
 }
 
 // Subscribe to Kafka
@@ -201,6 +183,7 @@ func subscribeToKafkaTopic(topic_name string) {
 	log.Println("Subscribed to topic: " + topic)
 
 	// Loop and read messages from the topic
+	var rcv_msg string
 	for {
 		// Read a message from the topic
 		msg, err := r.ReadMessage(context.Background())
@@ -208,7 +191,69 @@ func subscribeToKafkaTopic(topic_name string) {
 			log.Println("could not read message: " + err.Error())
 		}
 
+		rcv_msg = string(msg.Value)
 		// Print the message key and value to the console
-		log.Println("Received Message (" + topic_name + ") : " + string(msg.Value))
+		log.Println("Received Message (" + topic_name + ") : " + rcv_msg)
+
+		// Parse the JSON data into a struct
+		var data SensorData
+		err = json.Unmarshal([]byte(rcv_msg), &data)
+		if err != nil {
+			log.Println("Error unmarshalling JSON:" + err.Error())
+			return
+		}
+
+		log.Println("Serial: " + data.Serial)
+		log.Println("Type: " + data.Type)
+		log.Print("LastUpdate: ")
+		log.Println(data.Timestamp)
+		log.Print("Value 1: ")
+		log.Println(data.Reading1)
+		log.Print("Value 2: ")
+		log.Println(data.Reading2)
+
+		go insertSensorData(data)
 	}
+}
+
+func insertSensorData(data SensorData) {
+
+	// Connect to QuestDB
+	ctx := context.TODO()
+	sender, err := questdb.LineSenderFromConf(ctx, "http::addr=questdb:9000;")
+	if err != nil {
+		log.Println("Error connecting to QuestDB: " + err.Error())
+	}
+
+	// Make sure to close the sender on exit to release resources.
+	//defer sender.Close(ctx)
+
+	// Create the row and insert into QuestDB
+	last_updated, _ := time.Parse(time.RFC3339, data.Timestamp)
+	err = sender.
+		Table("sensor_historical_data").
+		Symbol("serial_number", data.Serial).
+		StringColumn("sensor_type", data.Type).
+		TimestampColumn("timestamp", last_updated).
+		Float64Column("reading1", data.Reading1).
+		Float64Column("reading2", data.Reading2).
+		At(ctx, last_updated)
+
+	if err != nil {
+		log.Println("Insert data error: " + err.Error())
+		sender.Close(ctx)
+		return
+	}
+
+	// Make sure that the messages are sent over the network.
+	err = sender.Flush(ctx)
+	if err != nil {
+		log.Println("Flush context error: " + err.Error())
+		sender.Close(ctx)
+		return
+	}
+
+	log.Println("Insert data OK.")
+	sender.Close(ctx)
+
 }

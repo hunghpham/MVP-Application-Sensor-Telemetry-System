@@ -72,18 +72,16 @@ func main() {
 	}
 
 	// Define the range
-	min := 3
-	max := 10
+	min := 1
+	max := 5
 
 	for _, serial := range list_of_sensors {
 		// Create a new random number generator
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 		// Generate a random integer
-		randomInt := r.Intn(max-min) + min // Generates a random integer between 3 and 10
+		randomInt := r.Intn(max-min) + min // Generates a random integer between min and max
 		fmt.Println("RadomInt: " + strconv.Itoa(randomInt))
 		go postSensorInfo(serial, "Temperature", post_url, randomInt)
-
 	}
 
 	// fmt.Println(list_of_sensors)
@@ -158,14 +156,14 @@ func postSensorInfo(serial string, sensor_type string, post_url string, delay_in
 			SetBody(jsonString).
 			Post(post_url) // Kafka endpoint for posting messages
 		if err != nil {
-			log.Println("Failed to send request: %v", err)
+			log.Println("Failed to send request: " + err.Error())
 		}
 
 		// Print response details
 		log.Println("Response Status Code:", resp.StatusCode())
 		log.Println("Response Body:", resp.String())
 
-		time.Sleep(time.Duration(delay_interval) * time.Second)
+		time.Sleep(time.Duration(delay_interval) * time.Minute)
 	}
 
 }

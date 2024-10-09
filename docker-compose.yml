@@ -36,7 +36,7 @@ services:
       - "2181:2181"
     volumes:
       - zookeeper_data:/var/lib/zookeeper #persist zookeeper data
-    restart: always  # Restart container on crash
+    
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -56,7 +56,7 @@ services:
       KAFKA_LOG_RETENTION_BYTES: -1              # No size limit for retention
     volumes:
       - kafka_data:/var/lib/kafka
-    restart: always  # Restart container on crash
+    
 
   kafka-rest-proxy:
     image: confluentinc/cp-kafka-rest:7.4.0
@@ -67,17 +67,18 @@ services:
     environment:
       KAFKA_REST_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:29092"
       KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
-    restart: always  # Restart container on crash
+    
 
   questdb:
     image: questdb/questdb:latest
     container_name: questdb
     ports:
-      - "9000:9000"
+      - "9000:9000"  # HTTP port      
+    environment:      
+      - QUESTDB_WAL_ENABLED=true  # Enable WAL
     volumes:
-      - ./questdb_data:/root/.questdb/db
-    restart: always  # Ensures container restarts automatically if it crashes or the host reboots
-
+      - questdb_data:/var/lib/questdb
+       
 volumes:
   zookeeper_data:
     driver: local
