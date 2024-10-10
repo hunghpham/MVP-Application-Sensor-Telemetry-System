@@ -1,3 +1,3 @@
-Post_URL = http://localhost:8082/v3/clusters/6WKqaaJ2S4KZzqbWQ2orlg/topics/sensor_data/records
+Post_URL = http://localhost:8082/v3/clusters/z9WCqV9aQUSwbbx1_0QlFg/topics/sensor_data/records
 Number_Of_Sensor = 5
 Serial_Start_With = ABCD

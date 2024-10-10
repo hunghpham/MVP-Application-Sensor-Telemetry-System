@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"net/url"
+
+	"database/sql"
 	"time"
 
-	//"bytes"
+	_ "github.com/lib/pq"
 
 	"strings"
 
@@ -42,51 +42,112 @@ func main() {
 }
 
 // /////////////// Database related functions /////////////////////
+// Execute a SQL query
+func executeQuery(query string) string {
+
+	connStr := "postgres://admin:quest@questdb:8812/qdb?sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		log.Println("Open database error: " + err.Error())
+	}
+	defer db.Close()
+
+	// Ensure the connection is alive
+	err = db.Ping()
+	if err != nil {
+		log.Println("Failed to ping database: " + err.Error())
+	}
+
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		log.Println("Prepare query error: " + err.Error())
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query()
+	if err != nil {
+		log.Println("Execute query error: " + err.Error())
+	}
+	defer rows.Close()
+
+	dataList := []SensorData{}
+	for rows.Next() {
+
+		var serialNumber string
+		var timestamp string
+		var sensorType string
+		var reading1 float64
+		var reading2 float64
+
+		// Scan the data into variables
+		if err := rows.Scan(&serialNumber, &timestamp, &sensorType, &reading1, &reading2); err != nil {
+			log.Println("Failed to scan row: " + err.Error())
+		}
+
+		//add each record to a list to return
+		var data SensorData
+		data.Serial = serialNumber
+		data.Type = sensorType
+		data.Timestamp = timestamp
+		data.Reading1 = reading1
+		data.Reading2 = reading2
+
+		dataList = append(dataList, data)
+
+		// Check for any errors encountered during iteration
+		if err := rows.Err(); err != nil {
+			log.Println("Error during row iteration: " + err.Error())
+		}
+	}
+
+	// Convert the slice to JSON
+	jsonData, err := json.Marshal(dataList)
+	if err != nil {
+		log.Println("Failed to marshal data: " + err.Error())
+
+	}
+
+	return string(jsonData)
+}
+
 // Get all current sensors
 func getAllSensors(ctx *gin.Context) {
 
-	// Define the SQL query
+	// Define the SQL query using REST HTTP API
 	query := `
 			SELECT serial_number, timestamp, sensor_type, reading1, reading2
 			FROM sensor_historical_data
 			LATEST BY serial_number;
 			`
+	result := executeQuery(query)
 
-	u, err := url.Parse("http://localhost:9000")
-	if err != nil {
-		log.Println("Parse URL error: " + err.Error())
-	}
-
-	u.Path += "exec"
-	params := url.Values{}
-	params.Add("query", query)
-	u.RawQuery = params.Encode()
-	url := fmt.Sprintf("%v", u)
-
-	res, err := http.Get(url)
-	if err != nil {
-		log.Println("Query through QUESTDB Rest API error: " + err.Error())
-	}
-
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		log.Println("Read response body error: " + err.Error())
-	}
-
-	log.Println(string(body))
-
-	ctx.JSON(http.StatusCreated, gin.H{"message": "OK"})
-
+	ctx.String(http.StatusOK, result)
 }
 
 // Get individual sensor historical data based on datetime range
-func getHistoricalData(context *gin.Context) {
-	context.JSON(http.StatusCreated, gin.H{"message": "OK"})
+func getHistoricalData(ctx *gin.Context) {
+
+	query := `SELECT * FROM sensor_historical_data
+				WHERE serial_number = '#SERIAL#'
+				AND timestamp BETWEEN '#SDT#' AND '#EDT#'
+				ORDER BY timestamp ASC;`
+
+	//Get sensor serial number and the date range
+	serial := ctx.Query("serial_number")
+	startDT := ctx.Query("start_dt")
+	endDT := ctx.Query("end_dt")
+
+	//modify query
+	query = strings.ReplaceAll(query, "#SERIAL#", serial)
+	query = strings.ReplaceAll(query, "#SDT#", startDT)
+	query = strings.ReplaceAll(query, "#EDT#", endDT)
+
+	result := executeQuery(query)
+
+	ctx.String(http.StatusOK, result)
 }
 
-// //////////////// Other helper functions
+// //////////////// Other helper functions ////////////////////////////////////////////////////////////////
 // Get Kafka cluster id using Kafka REST Proxy instead of native client, just demonstrating its flexibility
 func getKafkaClusterID(url string) (string, error) {
 
@@ -111,18 +172,18 @@ func getKafkaClusterID(url string) (string, error) {
 }
 
 // Get an instance Kafka cluster ID based on URL
-func create_kafka_topic_and_subscribe(context *gin.Context) {
+func create_kafka_topic_and_subscribe(ctx *gin.Context) {
 
 	url := "http://kafka-rest-proxy:8082/v3/clusters"
 
 	//Get Kafka local cluster id using Kafka REST API proxy, demonstrating REST works as well
 	cluster_id, err := getKafkaClusterID(url)
 	if err != nil {
-		context.JSON(http.StatusOK, gin.H{"Status": "Server error, unable to get Kafka cluster id.", "Error": err.Error()})
+		ctx.JSON(http.StatusOK, gin.H{"Status": "Server error, unable to get Kafka cluster id.", "Error": err.Error()})
 	}
 
 	// Get topic name from the post
-	topic := context.Query("topic_name")
+	topic := ctx.Query("topic_name")
 	broker := "kafka:9092"
 	partitions := 1
 	replicationFactor := 1
@@ -137,7 +198,7 @@ func create_kafka_topic_and_subscribe(context *gin.Context) {
 	// Create a new admin client
 	conn, err := kafka.Dial("tcp", broker)
 	if err != nil {
-		context.JSON(http.StatusOK, gin.H{"status": "Connect to Kafka failed!", "error": err.Error()})
+		ctx.JSON(http.StatusOK, gin.H{"status": "Connect to Kafka failed!", "error": err.Error()})
 	}
 	defer conn.Close()
 
@@ -148,7 +209,7 @@ func create_kafka_topic_and_subscribe(context *gin.Context) {
 		ReplicationFactor: replicationFactor,
 	})
 	if err != nil {
-		context.JSON(http.StatusOK, gin.H{"status": "Failed to create topic!", "error": err.Error()})
+		ctx.JSON(http.StatusOK, gin.H{"status": "Failed to create topic!", "error": err.Error()})
 		return
 	}
 
@@ -159,7 +220,7 @@ func create_kafka_topic_and_subscribe(context *gin.Context) {
 	go subscribeToKafkaTopic(topic)
 
 	//Return messages to user
-	context.JSON(http.StatusOK, gin.H{"Status": "OK", "Kafka_Endpoint": new_url + "/" + topic + "/records"})
+	ctx.JSON(http.StatusOK, gin.H{"Status": "OK", "Kafka_Endpoint": new_url + "/" + topic + "/records"})
 
 }
 
@@ -226,7 +287,7 @@ func insertSensorData(data SensorData) {
 	}
 
 	// Make sure to close the sender on exit to release resources.
-	//defer sender.Close(ctx)
+	defer sender.Close(ctx)
 
 	// Create the row and insert into QuestDB
 	last_updated, _ := time.Parse(time.RFC3339, data.Timestamp)
@@ -254,6 +315,6 @@ func insertSensorData(data SensorData) {
 	}
 
 	log.Println("Insert data OK.")
-	sender.Close(ctx)
+	//sender.Close(ctx)
 
 }
