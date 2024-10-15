@@ -11,7 +11,7 @@
 	</main>
 
 	<footer>
-		<p>visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to learn SvelteKit</p>
+		<p>At <a href="https://mesalabs.com/">Mesa Labs</a> we measure what matters</p>
 	</footer>
 </div>
 

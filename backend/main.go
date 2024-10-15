@@ -14,6 +14,7 @@ import (
 
 	"strings"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/questdb/go-questdb-client/v3"
 	"github.com/segmentio/kafka-go"
@@ -31,6 +32,9 @@ type SensorData struct {
 func main() {
 
 	server := gin.Default()
+
+	//Apply the CORS middleware
+	server.Use(cors.Default())
 
 	//GET endpoints
 	server.GET("/api/get_all_sensors", getAllSensors)                                     //connect to QuestDB to get all sensors info
@@ -80,7 +84,7 @@ func executeQuery(query string) string {
 		var reading2 float64
 
 		// Scan the data into variables
-		if err := rows.Scan(&serialNumber, &timestamp, &sensorType, &reading1, &reading2); err != nil {
+		if err := rows.Scan(&serialNumber, &sensorType, &timestamp, &reading1, &reading2); err != nil {
 			log.Println("Failed to scan row: " + err.Error())
 		}
 
@@ -115,9 +119,9 @@ func getAllSensors(ctx *gin.Context) {
 
 	// Define the SQL query using REST HTTP API
 	query := `
-			SELECT serial_number, timestamp, sensor_type, reading1, reading2
+			SELECT serial_number, sensor_type, timestamp, reading1, reading2
 			FROM sensor_historical_data
-			LATEST BY serial_number;
+			LATEST BY serial_number ORDER BY serial_number ASC;
 			`
 	result := executeQuery(query)
 

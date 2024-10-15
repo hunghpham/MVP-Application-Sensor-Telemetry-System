@@ -72,8 +72,8 @@ func main() {
 	}
 
 	// Define the range
-	min := 1
-	max := 5
+	min := 5
+	max := 10
 
 	for _, serial := range list_of_sensors {
 		// Create a new random number generator
@@ -81,6 +81,9 @@ func main() {
 		// Generate a random integer
 		randomInt := r.Intn(max-min) + min // Generates a random integer between min and max
 		fmt.Println("RadomInt: " + strconv.Itoa(randomInt))
+
+		time.Sleep(time.Second * 2)
+
 		go postSensorInfo(serial, "Temperature", post_url, randomInt)
 	}
 
@@ -163,7 +166,7 @@ func postSensorInfo(serial string, sensor_type string, post_url string, delay_in
 		log.Println("Response Status Code:", resp.StatusCode())
 		log.Println("Response Body:", resp.String())
 
-		time.Sleep(time.Duration(delay_interval) * time.Minute)
+		time.Sleep(time.Duration(delay_interval) * time.Second)
 	}
 
 }
