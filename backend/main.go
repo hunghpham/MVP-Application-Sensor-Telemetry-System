@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/questdb/go-questdb-client/v3"
 	"github.com/segmentio/kafka-go"
 	"github.com/tidwall/gjson"
@@ -27,6 +28,63 @@ type SensorData struct {
 	Timestamp string  `json:"Timestamp"`
 	Reading1  float64 `json:"Reading1"`
 	Reading2  float64 `json:"Reading2"`
+	Reading3  float64 `json:"Reading3"`
+}
+
+// WebSocket upgrader
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all origins for simplicity
+	},
+}
+
+// Global slice to hold active WebSocket connections
+var clients = make(map[*websocket.Conn]bool)
+
+// Broadcast channel for sending messages
+var broadcast = make(chan []byte)
+
+func handleWebSocket(c *gin.Context) {
+	// Upgrade the connection to a WebSocket
+	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Println("Failed to upgrade to WebSocket:", err)
+		return
+	}
+	defer ws.Close()
+
+	// Register the new client
+	clients[ws] = true
+	defer delete(clients, ws)
+
+	// Handle incoming messages
+	for {
+		_, message, err := ws.ReadMessage()
+		if err != nil {
+			log.Println("Error reading message:", err)
+			break
+		}
+		log.Printf("Received: %s", message)
+
+		// Optionally, we can send message right here by sending the message to the broadcast channel
+		// broadcast <- message
+	}
+}
+
+// Broadcast messages to all connected clients
+func broadcastMessages() {
+	for {
+		message := <-broadcast // Wait for a message to broadcast
+
+		for client := range clients {
+			err := client.WriteMessage(websocket.TextMessage, message)
+			if err != nil {
+				log.Println("Error writing message to client:", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
+	}
 }
 
 func main() {
@@ -40,6 +98,12 @@ func main() {
 	server.GET("/api/get_all_sensors", getAllSensors)                                     //connect to QuestDB to get all sensors info
 	server.GET("/api/get_sensor_historical_data", getHistoricalData)                      //connect to QuestDB to get historical data
 	server.GET("/api/create_kafka_topic_and_subscribe", create_kafka_topic_and_subscribe) //create kafka topic through Kafka rest api
+
+	// Set up WebSocket endpoint
+	server.GET("/ws", handleWebSocket)
+
+	// Start the broadcast goroutine, url is ws://localhost:8080/ws
+	go broadcastMessages()
 
 	//Start the backend server listening on port 8080
 	log.Fatal(server.Run(":8080"))
@@ -82,9 +146,10 @@ func executeQuery(query string) string {
 		var sensorType string
 		var reading1 float64
 		var reading2 float64
+		var reading3 float64
 
 		// Scan the data into variables
-		if err := rows.Scan(&serialNumber, &sensorType, &timestamp, &reading1, &reading2); err != nil {
+		if err := rows.Scan(&serialNumber, &sensorType, &timestamp, &reading1, &reading2, &reading3); err != nil {
 			log.Println("Failed to scan row: " + err.Error())
 		}
 
@@ -95,6 +160,7 @@ func executeQuery(query string) string {
 		data.Timestamp = timestamp
 		data.Reading1 = reading1
 		data.Reading2 = reading2
+		data.Reading3 = reading3
 
 		dataList = append(dataList, data)
 
@@ -119,7 +185,7 @@ func getAllSensors(ctx *gin.Context) {
 
 	// Define the SQL query using REST HTTP API
 	query := `
-			SELECT serial_number, sensor_type, timestamp, reading1, reading2
+			SELECT serial_number, sensor_type, timestamp, reading1, reading2, reading3
 			FROM sensor_historical_data
 			LATEST BY serial_number ORDER BY serial_number ASC;
 			`
@@ -260,6 +326,9 @@ func subscribeToKafkaTopic(topic_name string) {
 		// Print the message key and value to the console
 		log.Println("Received Message (" + topic_name + ") : " + rcv_msg)
 
+		// Send the message over websocket for any clients are currently connected.
+		broadcast <- []byte(rcv_msg)
+
 		// Parse the JSON data into a struct
 		var data SensorData
 		err = json.Unmarshal([]byte(rcv_msg), &data)
@@ -276,6 +345,8 @@ func subscribeToKafkaTopic(topic_name string) {
 		log.Println(data.Reading1)
 		log.Print("Value 2: ")
 		log.Println(data.Reading2)
+		log.Print("Value 3: ")
+		log.Println(data.Reading3)
 
 		go insertSensorData(data)
 	}
@@ -302,6 +373,7 @@ func insertSensorData(data SensorData) {
 		TimestampColumn("timestamp", last_updated).
 		Float64Column("reading1", data.Reading1).
 		Float64Column("reading2", data.Reading2).
+		Float64Column("reading3", data.Reading3).
 		At(ctx, last_updated)
 
 	if err != nil {

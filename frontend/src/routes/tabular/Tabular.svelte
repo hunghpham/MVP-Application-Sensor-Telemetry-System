@@ -1,6 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';        
-  
+  import { onMount, onDestroy } from 'svelte';       
   
   let sensors = [];
   let historical_sensor_data = [];
@@ -113,44 +112,47 @@
             
 </script>
     
+<h1 class="text-4xl font-bold text-gray mb-4 p-5">Historical Data</h1>  
 
 <!-- Dropdown and Buttons -->
 <div>
   <label for="sensor-select">Select Sensor: </label>
-  <select id="sensor-select" bind:value={selectedSensor}>
-    <option value="" disabled selected>Select a sensor</option>
+  <select id="sensor-select" bind:value={selectedSensor} class="bg-gray-600 text-white border border-gray-600 rounded-md cursor-pointer transition-colors duration-300 hover:bg-gray-500 dark:bg-gray-900 dark:border-gray-700 m-2 p-2 text-lg shadow-2xl">
+    <option value="" disabled selected class="bg-gray-600 text-white">Select a sensor</option>
     {#each sensors as sensor}
-      <option value={sensor.Serial}>{sensor.Serial}</option>
+      <option value={sensor.Serial} class="bg-gray-600 text-white">{sensor.Serial}</option>
     {/each}
   </select>
 
-  <button on:click={() => setTimeRange('1 hour')}>1 hour</button>
-  <button on:click={() => setTimeRange('1 day')}>1 day</button>
-  <button on:click={() => setTimeRange('1 week')}>1 week</button>
-  <button on:click={() => setTimeRange('1 month')}>1 month</button>
+  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 hour')}>1 hour</button>
+  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 day')}>1 day</button>
+  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 week')}>1 week</button>
+  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 month')}>1 month</button>
 </div>
 
 
 <!-- Table -->
-<table>
+<table class="w-full border-collapse mt-5 text-center rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 shadow-2xl">
   <thead>
-    <tr>
-      <th class="{sortBy === 'Serial' ? 'sort-' + sortOrder : ''}" on:click={() => sort('Serial')}>Serial Number</th>
-      <th class="{sortBy === 'Timestamp' ? 'sort-' + sortOrder : ''}" on:click={() => sort('Timestamp')}>Timestamp</th>
-      <th class="{sortBy === 'Type' ? 'sort-' + sortOrder : ''}" on:click={() => sort('Type')}>Type</th>
-      <th class="{sortBy === 'Reading1' ? 'sort-' + sortOrder : ''}" on:click={() => sort('Reading1')}>Reading 1</th>
-      <!-- <th class="{sortBy === 'Reading2' ? 'sort-' + sortOrder : ''}" on:click={() => sort('Reading2')}>Reading 2</th> -->
+    <tr class="bg-gray-600 text-white cursor-pointer">
+      <th class="{sortBy === 'Serial' ? 'sort-' + sortOrder : ''} w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-lg" on:click={() => sort('Serial')}  >Serial</th>
+      <th class="{sortBy === 'Timestamp' ? 'sort-' + sortOrder : ''} w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-lg" on:click={() => sort('Timestamp')}>Timestamp</th>
+      <th class="{sortBy === 'Type' ? 'sort-' + sortOrder : ''} w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-lg" on:click={() => sort('Type')}>Type</th>
+      <th class="{sortBy === 'Reading1' ? 'sort-' + sortOrder : ''} w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-lg" on:click={() => sort('Reading1')}>Temperature</th>
+      <th class="{sortBy === 'Reading2' ? 'sort-' + sortOrder : ''} w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-lg" on:click={() => sort('Reading2')}>Humidity</th>
+      <th class="{sortBy === 'Reading3' ? 'sort-' + sortOrder : ''} w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-lg" on:click={() => sort('Reading3')}>CO2</th>
     </tr>
   </thead>
   <tbody>
     {#if historical_sensor_data.length > 0}
       {#each historical_sensor_data as sensor}
-        <tr on:click={() => handleRowClick(sensor)}>
-          <td>{sensor.Serial}</td>
-          <td>{new Date(sensor.Timestamp).toLocaleDateString()} {new Date(sensor.Timestamp).toLocaleTimeString()}</td>
-          <td>{sensor.Type}</td>
-          <td>{sensor.Reading1.toFixed(2)}°C</td>
-          <!-- <td>{sensor.Reading2.toFixed(2)}%</td> -->
+        <tr class="bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 odd:bg-gray-50 even:bg-gray-200 dark:even:bg-gray-800">
+          <td class="w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Serial}</td>
+          <td class="w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{new Date(sensor.Timestamp).toLocaleDateString()} {new Date(sensor.Timestamp).toLocaleTimeString()}</td>
+          <td class="w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Type}</td>
+          <td class="w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Reading1.toFixed(2)}°C</td>
+          <td class="w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Reading2.toFixed(2)}%</td>
+          <td class="w-1/6 p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Reading3.toFixed(2)}%</td>
         </tr>
       {/each}
     {:else}
@@ -162,7 +164,7 @@
   
 
 <style>
-  table {
+  /* table {
     width: 100%;
     border-collapse: collapse;
     margin: 20px 0;    
@@ -182,17 +184,17 @@
   td {
     font-size: 16px;    
     font-weight: 500;
-  }  
+  }   */
 
-  th {
+  /* th {
     cursor: pointer;
     background-color: #6f7072;
     color: white;
-  }
+  } */
 
-  th:hover {
+  /* th:hover {
     background-color: #ddd;
-  }
+  } */
 
   th.sort-asc::after {
     content: ' ▲';
@@ -202,21 +204,21 @@
     content: ' ▼';
   }
 
-  tr:nth-child(even) {
+  /* tr:nth-child(even) {
     background-color: #f9f9f9;
   }
 
   tr:hover {
     background-color: #d4d4d4;
-  }      
+  }       */
 
-  select, button {
+  /* select, button {
     margin: 10px;
     padding: 10px;
     font-size: 16px;
-  }
+  }  */
 
-  button {
+  /* button {
     background-color: #6f7072;
     color: white;
     border: none;

@@ -20,9 +20,9 @@ services:
     image: node:alpine
     ports:
       - "3000:3000"
-    working_dir: /app
-    depends_on:
-      - backend
+      - "4173:4173"
+      - "3001:3001"
+    working_dir: /app   
     volumes:
       - ./frontend:/app
     entrypoint: ['npm', 'run', 'dev']
@@ -77,7 +77,7 @@ services:
     environment:      
       - QUESTDB_WAL_ENABLED=true  # Enable WAL
     volumes:
-      - questdb_data:/var/lib/questdb
+      - questdb_data:/var/lib/questdb    
        
 volumes:
   zookeeper_data:

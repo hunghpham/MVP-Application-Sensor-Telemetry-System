@@ -3,10 +3,11 @@
 	import '../app.css';
 </script>
 
+<!-- <div class="app"> -->
 <div class="app">
 	<Header />
 
-	<main>
+	<main class="flex-1 flex flex-col p-4 w-full max-w-2xl mx-auto box-border">
 		<slot />
 	</main>
 
@@ -31,7 +32,7 @@
 		max-width: 64rem;
 		margin: 0 auto;
 		box-sizing: border-box;
-	}
+	} 
 
 	footer {
 		display: flex;
