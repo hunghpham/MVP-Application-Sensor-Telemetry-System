@@ -6,11 +6,7 @@
 	<title>Historical Graph</title>	
 </svelte:head>
 
-<section>
-	<h1>	
-		Historical Data
-	</h1>
-	
+<section>		
 	<!-- load graphical svelte component -->
 	<Tabular />	
 </section>

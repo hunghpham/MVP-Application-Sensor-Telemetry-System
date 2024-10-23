@@ -6,11 +6,7 @@
 	<title>Dashboard</title>	
 </svelte:head>
 
-<section>
-	<h1>	
-		Sensor Dashboard
-	</h1>
-	
+<section>		
 	<!-- load dashboard svelte component -->
 	<SensorDashboard />	
 </section>

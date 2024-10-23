@@ -1,19 +1,12 @@
-<script>	
-	//import welcome from '$lib/images/svelte-welcome.webp';
-	//import welcome_fallback from '$lib/images/svelte-welcome.png';
-    import Graphical from './Graphical.svelte';
-	//import ChartJS from './ChartJS.svelte';
+<script>		
+    import Graphical from './Graphical.svelte';	
 </script>
 
 <svelte:head>
 	<title>Historical Graph</title>	
 </svelte:head>
 
-<section>
-	<h1>	
-		Historical Graph
-	</h1>
-	
+<section>	
 	<!-- load graphical svelte component -->
 	<Graphical />	
 </section>

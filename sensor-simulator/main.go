@@ -4,14 +4,17 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/tidwall/gjson"
 )
 
 // Struct to match the JSON structure
@@ -24,6 +27,7 @@ type Payload struct {
 			Timestamp string  `json:"Timestamp"`
 			Reading1  float64 `json:"Reading1"`
 			Reading2  float64 `json:"Reading2"`
+			Reading3  float64 `json:"Reading3"`
 		} `json:"data"`
 	} `json:"value"`
 }
@@ -52,12 +56,18 @@ func main() {
 		fmt.Println("Error reading file:", err)
 	}
 
-	//Get post url
-	splitStr := strings.Split(lines[0], "=")
-	post_url := strings.TrimSpace(splitStr[1])
+	//Get post url, Kafka URL for posting sensor to a topic channel
+	post_url, err := getKafkaPublishURLEndpointandStartListener()
+	fmt.Println(post_url)
+	if err != nil {
+		fmt.Println("Unable to start Kafka Rest endpoint listener for sensor data!, try again!")
+	}
+
+	//splitStr := strings.Split(lines[0], "=")
+	//post_url := strings.TrimSpace(splitStr[1])
 
 	//Get number of sensor
-	splitStr = strings.Split(lines[1], "=")
+	splitStr := strings.Split(lines[1], "=")
 	number_of_sensors := strings.TrimSpace(splitStr[1])
 
 	//Get sensor serial start with characters
@@ -84,7 +94,7 @@ func main() {
 
 		time.Sleep(time.Second * 2)
 
-		go postSensorInfo(serial, "Temperature", post_url, randomInt)
+		go postSensorInfo(serial, "Incubator", post_url, randomInt)
 	}
 
 	// fmt.Println(list_of_sensors)
@@ -96,6 +106,29 @@ func main() {
 		time.Sleep(time.Hour)
 	}
 
+}
+
+// This return the Kafka endpoint and start the topic listener
+func getKafkaPublishURLEndpointandStartListener() (string, error) {
+
+	//Send GET request
+	resp, err := http.Get("http://localhost:8080/api/create_kafka_topic_and_subscribe?topic_name=sensor_data")
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// Get cluster id string from the json response
+	value := gjson.Get(string(body), "Kafka_Endpoint")
+
+	return value.String(), nil
 }
 
 // post sensor information
@@ -111,30 +144,22 @@ func postSensorInfo(serial string, sensor_type string, post_url string, delay_in
 		// Define the range
 		var min = -10.0
 		var max = 30.0
-		// Generate a random float within the range [min, max)
-		var randomFloat = min + (r.Float64() * (max - min))
+		// Generate a random temperature value within the range [min, max)
+		var randomTempValue = min + (r.Float64() * (max - min))
 
-		if sensor_type == "Temperature" {
+		// Define the range for humidity
+		min = 0.0
+		max = 100.0
+		// Generate a random humidity value within the range [min, max)
+		var randomHumValue = min + (r.Float64() * (max - min))
 
-			//assign temperature only and set humidity to 0 because it's a temp sensor only
-			payload.Value.Data.Reading1 = randomFloat
-			payload.Value.Data.Reading2 = 0.0
-
-		} else {
-
-			//assign temperature
-			payload.Value.Data.Reading1 = randomFloat
-
-			// Define the range for humidity
-			min = 0.0
-			max = 100.0
-			// Generate a random float within the range [min, max)
-			randomFloat = min + (r.Float64() * (max - min))
-
-			payload.Value.Data.Reading2 = randomFloat
-		}
+		// Generate a random Co2 value within the range [min, max)
+		var randomCo2Value = min + (r.Float64() * (max - min))
 
 		// Assign values to the struct fields
+		payload.Value.Data.Reading1 = randomTempValue
+		payload.Value.Data.Reading2 = randomHumValue
+		payload.Value.Data.Reading3 = randomCo2Value
 		payload.Value.Type = "JSON"
 		payload.Value.Data.Serial = serial
 		payload.Value.Data.Type = sensor_type

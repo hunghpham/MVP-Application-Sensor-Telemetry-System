@@ -1,15 +1,17 @@
-<script>
+<script>  
   import { onMount, onDestroy } from 'svelte';
   import Chart from "chart.js/auto";
   // Import the date adapter
-  import 'chartjs-adapter-luxon';
+  import 'chartjs-adapter-luxon';  
 
   let chart;
   let chartCanvas;
   let chart_label = '';
 
-  // Example data: DateTime and Temperature
-  let chart_data = [];
+  // chart data for generating series
+  let chart_data_temp = [];
+  let chart_data_hum = [];
+  let chart_data_co2 = [];
  
   let sensors = [];
   let historical_sensor_data = [];
@@ -18,16 +20,69 @@
   let error_fetch_all_sensor = '';
   let error_fetch_sensor_historical_data = '';
   let run_int_fetchAllSensors;  
-  let selectedSensorSerial = '';
-  let selectedSensorTimeStamp = '';
+  let selectedSensorSerial = '';    
+  let ws;
   
   // Fetch data when the component is mounted
   onMount(async () => {
+    if (typeof window !== 'undefined') {
+      // This code runs only in the browser
+      console.log('Running on the client side');
+    } else {
+      // This code runs on the server side (SSR)
+      console.log('Running on the server side');
+    }
+
     fetchAllSensors();
     generateChart();
     
-    //Run every 5 seconds
-    run_int_fetchAllSensors = setInterval(fetchAllSensors, 2000);    
+    //Run every 20 seconds
+    run_int_fetchAllSensors = setInterval(()=> {handleRowClick(selectedSensorSerial)}, 120000);    
+
+    //connect to the server using websocket
+    ws = new WebSocket("ws://localhost:8080/ws");
+
+    // Listen for messages from the server over websocket
+		ws.onmessage = (event) => {
+			
+      const jsonObject = JSON.parse(event.data);
+      console.log(jsonObject);
+            
+      fetchAllSensors();
+
+      //Update the table, find the sensor and update it      
+      const sensor = sensors.find(sensor => sensor.Serial === jsonObject.Serial);     
+      
+      //Update the chart
+      if (sensor.Serial === selectedSensorSerial) {
+        //Create the new data point object for temperature
+        const new_temp_data_point = {
+          x: new Date(jsonObject.Timestamp), 
+          y: jsonObject.Reading1
+        };
+
+        //Create the new data point object for humidity
+        const new_hum_data_point = {
+          x: new Date(jsonObject.Timestamp), 
+          y: jsonObject.Reading2
+        };
+
+        //Create the new data point object for CO2
+        const new_CO2_data_point = {
+          x: new Date(jsonObject.Timestamp), 
+          y: jsonObject.Reading3
+        };
+
+        updateChart(new_temp_data_point, new_hum_data_point, new_CO2_data_point);
+      }
+
+		};
+
+		// Handle WebSocket errors
+		ws.onerror = (event) => {
+			console.log("WebSocket error:", event);
+		};
+
   });
 
   // Clean up the interval on component destroy
@@ -37,64 +92,26 @@
             chart.destroy();
         }
   });
-
-  // Provide simple column sorting for the table
-  function sort(column) {
-    if (sortBy === column) {
-      sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-    } else {
-      sortBy = column;
-      sortOrder = 'asc';
-    }
-
-    sensors = sensors.slice().sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-
-      if (typeof aValue === 'string') {
-        return sortOrder === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
-      }
-
-      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
-    });
-  }
-
-  //Fetch all unique sensors 
+    
+  //Fetch all unique sensors into the array, this will cause a reactive update in svelte table, svelte reactive nature at works here...
   async function fetchAllSensors() {
     try {
       const response = await fetch('http://localhost:8080/api/get_all_sensors');
       if (!response.ok) {
         throw new Error("Failed to load data...");
       }
-      sensors = await response.json();  
-      
-      //Get the sensor currently displaying its data in the chart
-      let sensor_in_chart = sensors.find(obj => obj.Serial == selectedSensorSerial);
-
-      //Create the new data point object
-      const new_data_point = {
-        x: new Date(sensor_in_chart.Timestamp), 
-        y: sensor_in_chart.Reading1
-      };
-      
-      const dataLength = chart.data.datasets[0].data.length;
-      const latest_date_value_on_chart = new Date(chart.data.datasets[0].data[dataLength - 1].x);      
-
-      console.log(latest_date_value_on_chart);
-      console.log(new_data_point.x);
-
-      if (new_data_point.x > latest_date_value_on_chart) {        
-        updateChart(new_data_point);
-      }
+      sensors = await response.json();              
              
     } catch (err) {
       error_fetch_all_sensor = err.message;
     }
   }  
 
-  //Update Chart with new data point
-  function updateChart(new_data_point) {
-    chart.data.datasets[0].data.push(new_data_point);
+  //Update Chart with new data points
+  function updateChart(new_temp_data_point, new_hum_data_point, new_CO2_data_point) {    
+    chart.data.datasets[0].data.push(new_temp_data_point);
+    chart.data.datasets[1].data.push(new_hum_data_point);
+    chart.data.datasets[2].data.push(new_CO2_data_point);
     chart.update();
   }
 
@@ -123,11 +140,15 @@
       //console.log(historical_sensor_data);    
 
       //Got historical data, assign to   
-      chart_data = [];
+      chart_data_temp = [];
+      chart_data_hum = [];
+      chart_data_co2 = [];
 
       //loop through response and assign to chart data
       historical_sensor_data.forEach(item => {
-        chart_data.push({time: new Date(item.Timestamp), temperature: item.Reading1})  
+        chart_data_temp.push({time: new Date(item.Timestamp), temperature: item.Reading1})  
+        chart_data_hum.push({time: new Date(item.Timestamp), humidity: item.Reading2})
+        chart_data_co2.push({time: new Date(item.Timestamp), co2: item.Reading3})
       });
 
       //now generate the graph for this sensor data
@@ -139,8 +160,8 @@
   }
 
   //Function event row click
-  function handleRowClick(row) {
-    selectedSensorSerial = row.Serial;    
+  function handleRowClick(serial) {
+    selectedSensorSerial = serial;    
     chart_label = selectedSensorSerial;
     
 
@@ -167,25 +188,52 @@
     }
 
     // Create the chart when the component is mounted
-    const ctx = chartCanvas.getContext("2d");    
+    const ctx = chartCanvas.getContext("2d");   
+    
+    const series_data = {            
+        datasets: [
+          {
+            label: 'Temperature (°C)',
+            data: chart_data_temp.map(d => ({
+                x: d.time,  // x-axis is DateTime
+                y: d.temperature  // y-axis is temperature
+            })),                
+            borderColor: 'rgb(255, 99, 132)', // Red line for temperature
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            fill: true,
+            tension: 0.1,
+            yAxisID: 'y',
+          }, 
+          {
+            label: 'Humidity (%)',
+            data: chart_data_hum.map(d => ({
+                x: d.time,  // x-axis is DateTime
+                y: d.humidity  // y-axis is temperature
+            })),                
+            borderColor: 'rgb(54, 162, 235)', // Blue line for humidity
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            fill: true,
+            tension: 0.1,
+            yAxisID: 'y1',
+          },
+          {
+            label: 'CO2 (%)',
+            data: chart_data_co2.map(d => ({
+                x: d.time,  // x-axis is DateTime
+                y: d.co2  // y-axis is temperature
+            })),                
+            borderColor: 'rgb(255, 206, 86)', // Yellow for CO2
+            backgroundColor: 'rgba(255, 206, 86, 0.2)',
+            fill: true,
+            tension: 0.1,
+            yAxisID: 'y2',
+          }          
+      ]
+    };
 
-    //Chart.js setup and configuration for line chart
-    chart = new Chart(ctx, {
+    const chart_config = {
         type: "line",
-        data: {
-            //labels: data.map(d => d.time.toLocaleTimeString()), // Convert datetime to readable time
-            datasets: [{
-                label: chart_label,
-                data: chart_data.map(d => ({
-                    x: d.time,  // x-axis is DateTime
-                    y: d.temperature  // y-axis is temperature
-                })),                
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                fill: true,
-                tension: 0.1
-            }]
-        },
+        data: series_data,
         options: {
             responsive: true,
             plugins: {
@@ -194,15 +242,25 @@
                   text: chart_label + ' - Real-Time Graph',  // Set the chart title text
                   font: {
                       size: 20  // Adjust the font size of the title
-                  }
+                  },
+                  color: 'white'
+              },
+              legend: {
+                labels: {
+                    color: 'white' // Legend text color
+                },                
+              },
+              tooltip: {
+                bodyColor: 'white', // Tooltip text color
+                titleColor: 'white' // Tooltip title color
               }
             },
-            scales: {
+            scales: {                
                 x: {
                     type: 'time',
                     time: {
                         unit: 'minute',  // Set the base unit to minute
-                        //stepSize: 5,  // Display a tick every 5 minutes
+                        stepSize: 5,  // Display a tick every 5 minutes
                         displayFormats: {
                           minute: 'MMM D, h:mm a'  // Format for each tick label
                         },                   
@@ -210,42 +268,86 @@
                     },
                     title: {
                         display: true,
-                        text: 'Time'
+                        text: 'Time',
+                        color: 'white'
+                    },
+                    ticks: {
+                        color: 'white' // X-axis text color
                     }
                 },
                 y: {
                     title: {
                         display: true,
-                        text: 'Temperature (°C)'
+                        text: 'Temperature (°C)',
+                        color: 'white'
+                    },
+                    type: 'linear',
+                    position: 'left',
+                    ticks: {
+                        color: 'white' // Y-axis text color
+                    }
+                },
+                y1: {
+                    title: {
+                        display: true,
+                        text: 'Humidity (%)',
+                        color: 'white'
+                    },
+                    type: 'linear',
+                    position: 'right',
+                    ticks: {
+                        color: 'white' // Y-axis text color
+                    }
+                },
+                y2: {
+                    title: {
+                        display: true,
+                        text: 'CO2 (%)',
+                        color: 'white'
+                    },
+                    type: 'linear',
+                    position: 'left',
+                    ticks: {
+                        color: 'white' // Y-axis text color
                     }
                 }
             }
         }
-    });
+    };
+
+
+    //Chart.js setup and configuration for line chart
+    chart = new Chart(ctx, chart_config);
   }
   
 </script>
-  
-  
-<table>
+ 
+
+<h1 class="text-4xl font-bold text-gray mb-4 p-5">Sensor Dashboard</h1>  
+
+
+<!-- <table class="w-full border-collapse mt-5 text-center dark:bg-gray-800"> -->
+<table class="w-full border-collapse mt-5 text-center rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 shadow-2xl">
   <thead>
-    <tr>
-      <th>Serial Number</th>
-      <th>Timestamp</th>
-      <th>Type</th>
-      <th>Reading 1</th>
-      <!-- <th>Reading 2</th> -->
+    <tr class="bg-gray-600 text-white cursor-pointer">      
+      <th class="p-3 border-b border-gray-300 dark:border-gray-600 text-lg">Serial Number</th>
+      <th class="p-3 border-b border-gray-300 dark:border-gray-600 text-lg">Timestamp</th>
+      <th class="p-3 border-b border-gray-300 dark:border-gray-600 text-lg">Type</th>
+      <th class="p-3 border-b border-gray-300 dark:border-gray-600 text-lg">Temperature</th>
+      <th class="p-3 border-b border-gray-300 dark:border-gray-600 text-lg">Humidity</th>
+      <th class="p-3 border-b border-gray-300 dark:border-gray-600 text-lg">CO2</th>
     </tr>
   </thead>
   <tbody>
     {#if sensors.length > 0}
       {#each sensors as sensor}
-        <tr on:click={() => handleRowClick(sensor)}>
-          <td>{sensor.Serial}</td>
-          <td>{new Date(sensor.Timestamp).toLocaleDateString()} {new Date(sensor.Timestamp).toLocaleTimeString()}</td>
-          <td>{sensor.Type}</td>
-          <td>{sensor.Reading1.toFixed(2)}°C</td>
-          <!-- <td>{sensor.Reading2.toFixed(2)}%</td> -->
+        <tr on:click={() => handleRowClick(sensor.Serial)} class="bg-white dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-700 odd:bg-gray-50 even:bg-gray-200 dark:even:bg-gray-800">          
+          <td class="p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Serial}</td>
+          <td class="p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{new Date(sensor.Timestamp).toLocaleDateString()} {new Date(sensor.Timestamp).toLocaleTimeString()}</td>
+          <td class="p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Type}</td>
+          <td class="p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Reading1.toFixed(2)}°C</td>
+          <td class="p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Reading2.toFixed(2)}%</td>
+          <td class="p-3 border-b border-gray-300 dark:border-gray-600 text-base font-medium">{sensor.Reading3.toFixed(2)}%</td>
         </tr>
       {/each}
     {:else}
@@ -255,11 +357,17 @@
   </tbody>
 </table>
 
+<div class="p-10"></div>
+
 <!-- A canvas so chart.js can draw on -->
-<canvas bind:this={chartCanvas}></canvas>
+<div class="bg-gray-600 text-white p-4 border border-gray-600 rounded-lg shadow-2xl">  
+  <canvas bind:this={chartCanvas} class="max-w-full h-[500px]"></canvas> 
+</div>
 
 <style>
-  table {
+
+  
+  /* table {
     width: 100%;
     border-collapse: collapse;
     margin: 20px 0;    
@@ -289,26 +397,19 @@
 
   th:hover {
     background-color: #ddd;
-  }
+  } */
 
-  th.sort-asc::after {
-    content: ' ▲';
-  }
-
-  th.sort-desc::after {
-    content: ' ▼';
-  }
-
-  tr:nth-child(even) {
+  
+  /* tr:nth-child(even) {
     background-color: #f9f9f9;
   }
 
   tr:hover {
     background-color: #d4d4d4;
-  }
+  } */
 
-  canvas {
+  /* canvas {
       max-width: 100%;
       height: 500px;
-  }
+  } */
 </style>

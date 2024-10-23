@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import logo from '$lib/images/svelte-logo.svg';
 	import github from '$lib/images/github.svg';
+	import '../app.css';
 </script>
 
 <header>
@@ -20,17 +21,14 @@
 				<a href="/">Dashboard</a>
 			</li>
 			<li aria-current={$page.url.pathname === '/graphical' ? 'page' : undefined}>
-				<a href="/graphical">Graph</a>
+				<a href="/graphical">Graphical</a>
 			</li>
 			<li aria-current={$page.url.pathname === '/tabular' ? 'page' : undefined}>
 				<a href="/tabular">Tabular</a>
 			</li>
 			<li aria-current={$page.url.pathname === '/about' ? 'page' : undefined}>
-				<a href="/about">About</a>
-			</li>
-			<!-- <li aria-current={$page.url.pathname.startsWith('/sverdle') ? 'page' : undefined}>
-				<a href="/sverdle">About</a>
-			</li> -->
+				<a href="/about">Project Reflections</a>
+			</li>			
 		</ul>
 		<svg viewBox="0 0 2 3" aria-hidden="true">
 			<path d="M0,0 L0,3 C0.5,3 0.5,3 1,2 L2,0 Z" />
