@@ -22,6 +22,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// Sensor data structure, use for marhaling JSON and vice versa
 type SensorData struct {
 	Serial    string  `json:"Serial"`
 	Type      string  `json:"Type"`
@@ -31,18 +32,19 @@ type SensorData struct {
 	Reading3  float64 `json:"Reading3"`
 }
 
-// WebSocket upgrader
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for simplicity
-	},
-}
-
+// //////////////////////////// WEB SOCKET SECTION ///////////////////////////////////////
 // Global slice to hold active WebSocket connections
 var clients = make(map[*websocket.Conn]bool)
 
 // Broadcast channel for sending messages
 var broadcast = make(chan []byte)
+
+// WebSocket upgrader
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all origin clients
+	},
+}
 
 func handleWebSocket(c *gin.Context) {
 	// Upgrade the connection to a WebSocket
@@ -87,29 +89,7 @@ func broadcastMessages() {
 	}
 }
 
-func main() {
-
-	server := gin.Default()
-
-	//Apply the CORS middleware
-	server.Use(cors.Default())
-
-	//GET endpoints
-	server.GET("/api/get_all_sensors", getAllSensors)                                     //connect to QuestDB to get all sensors info
-	server.GET("/api/get_sensor_historical_data", getHistoricalData)                      //connect to QuestDB to get historical data
-	server.GET("/api/create_kafka_topic_and_subscribe", create_kafka_topic_and_subscribe) //create kafka topic through Kafka rest api
-
-	// Set up WebSocket endpoint
-	server.GET("/ws", handleWebSocket)
-
-	// Start the broadcast goroutine, url is ws://localhost:8080/ws
-	go broadcastMessages()
-
-	//Start the backend server listening on port 8080
-	log.Fatal(server.Run(":8080"))
-}
-
-// /////////////// Database related functions /////////////////////
+// //////////////////////////// Database related functions //////////////////////////////////////////
 // Execute a SQL query
 func executeQuery(query string) string {
 
@@ -217,7 +197,49 @@ func getHistoricalData(ctx *gin.Context) {
 	ctx.String(http.StatusOK, result)
 }
 
-// //////////////// Other helper functions ////////////////////////////////////////////////////////////////
+func insertSensorData(data SensorData) {
+
+	// Connect to QuestDB
+	ctx := context.TODO()
+	sender, err := questdb.LineSenderFromConf(ctx, "http::addr=questdb:9000;")
+	if err != nil {
+		log.Println("Error connecting to QuestDB: " + err.Error())
+	}
+
+	// Make sure to close the sender on exit to release resources.
+	defer sender.Close(ctx)
+
+	// Create the row and insert into QuestDB
+	last_updated, _ := time.Parse(time.RFC3339, data.Timestamp)
+	err = sender.
+		Table("sensor_historical_data").
+		Symbol("serial_number", data.Serial).
+		StringColumn("sensor_type", data.Type).
+		TimestampColumn("timestamp", last_updated).
+		Float64Column("reading1", data.Reading1).
+		Float64Column("reading2", data.Reading2).
+		Float64Column("reading3", data.Reading3).
+		At(ctx, last_updated)
+
+	if err != nil {
+		log.Println("Insert data error: " + err.Error())
+		sender.Close(ctx)
+		return
+	}
+
+	// Make sure that the messages are sent over the network.
+	err = sender.Flush(ctx)
+	if err != nil {
+		log.Println("Flush context error: " + err.Error())
+		sender.Close(ctx)
+		return
+	}
+
+	log.Println("Insert data OK.")
+	//sender.Close(ctx)
+}
+
+// ///////////////////////////////// Other helper functions ///////////////////////////////////////
 // Get Kafka cluster id using Kafka REST Proxy instead of native client, just demonstrating its flexibility
 func getKafkaClusterID(url string) (string, error) {
 
@@ -291,7 +313,6 @@ func create_kafka_topic_and_subscribe(ctx *gin.Context) {
 
 	//Return messages to user
 	ctx.JSON(http.StatusOK, gin.H{"Status": "OK", "Kafka_Endpoint": new_url + "/" + topic + "/records"})
-
 }
 
 // Subscribe to Kafka
@@ -302,14 +323,14 @@ func subscribeToKafkaTopic(topic_name string) {
 	groupID := topic_name + "-consumer" // Replace with your consumer group ID
 
 	// Set up the Kafka reader (consumer)
-	r := kafka.NewReader(kafka.ReaderConfig{
+	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: brokers,
 		Topic:   topic,
 		GroupID: groupID, // Consumer group ID, ensures message offsets are tracked
 	})
 
 	// Close the reader when the function returns
-	defer r.Close()
+	defer reader.Close()
 
 	log.Println("Subscribed to topic: " + topic)
 
@@ -317,7 +338,7 @@ func subscribeToKafkaTopic(topic_name string) {
 	var rcv_msg string
 	for {
 		// Read a message from the topic
-		msg, err := r.ReadMessage(context.Background())
+		msg, err := reader.ReadMessage(context.Background())
 		if err != nil {
 			log.Println("could not read message: " + err.Error())
 		}
@@ -352,45 +373,25 @@ func subscribeToKafkaTopic(topic_name string) {
 	}
 }
 
-func insertSensorData(data SensorData) {
+// Main function, entry point
+func main() {
 
-	// Connect to QuestDB
-	ctx := context.TODO()
-	sender, err := questdb.LineSenderFromConf(ctx, "http::addr=questdb:9000;")
-	if err != nil {
-		log.Println("Error connecting to QuestDB: " + err.Error())
-	}
+	server := gin.Default()
 
-	// Make sure to close the sender on exit to release resources.
-	defer sender.Close(ctx)
+	//Apply the CORS middleware
+	server.Use(cors.Default())
 
-	// Create the row and insert into QuestDB
-	last_updated, _ := time.Parse(time.RFC3339, data.Timestamp)
-	err = sender.
-		Table("sensor_historical_data").
-		Symbol("serial_number", data.Serial).
-		StringColumn("sensor_type", data.Type).
-		TimestampColumn("timestamp", last_updated).
-		Float64Column("reading1", data.Reading1).
-		Float64Column("reading2", data.Reading2).
-		Float64Column("reading3", data.Reading3).
-		At(ctx, last_updated)
+	//REST GET endpoints
+	server.GET("/api/get_all_sensors", getAllSensors)                                     //connect to QuestDB to get all sensors info
+	server.GET("/api/get_sensor_historical_data", getHistoricalData)                      //connect to QuestDB to get historical data
+	server.GET("/api/create_kafka_topic_and_subscribe", create_kafka_topic_and_subscribe) //create kafka topic through Kafka rest api
 
-	if err != nil {
-		log.Println("Insert data error: " + err.Error())
-		sender.Close(ctx)
-		return
-	}
+	// Set up WebSocket endpoint
+	server.GET("/ws", handleWebSocket)
 
-	// Make sure that the messages are sent over the network.
-	err = sender.Flush(ctx)
-	if err != nil {
-		log.Println("Flush context error: " + err.Error())
-		sender.Close(ctx)
-		return
-	}
+	// Start the broadcast goroutine, url is ws://localhost:8080/ws
+	go broadcastMessages()
 
-	log.Println("Insert data OK.")
-	//sender.Close(ctx)
-
+	//Start the backend server listening on port 8080
+	log.Fatal(server.Run(":8080"))
 }
