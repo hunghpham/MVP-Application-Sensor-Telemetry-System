@@ -13,7 +13,7 @@ const config = {
 
 export default config;
 
-// ///////////////////////////// Build to run static, no need for a server, run local, all compiled, vite server is also included in the build////////////////////////////
+//////////////////////////////// Build to run static, no need for a server, run local, all compiled, vite server is also included in the build////////////////////////////
 // import adapter from '@sveltejs/adapter-static';
 
 // const config = {

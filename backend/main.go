@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"io"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -19,7 +19,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/questdb/go-questdb-client/v3"
 	"github.com/segmentio/kafka-go"
-	"github.com/tidwall/gjson"
 )
 
 // Sensor data structure, use for marhaling JSON and vice versa
@@ -30,6 +29,22 @@ type SensorData struct {
 	Reading1  float64 `json:"Reading1"`
 	Reading2  float64 `json:"Reading2"`
 	Reading3  float64 `json:"Reading3"`
+}
+
+// data structure, use for marhaling JSON for min max report
+type MinMaxData struct {
+	Serial      string  `json:"Serial"`
+	Type        string  `json:"Type"`
+	Timestamp   string  `json:"Timestamp"`
+	Reading1Min float64 `json:"Reading1Min"`
+	Reading1Max float64 `json:"Reading1Max"`
+	Reading1Avg float64 `json:"Reading1Avg"`
+	Reading2Min float64 `json:"Reading2Min"`
+	Reading2Max float64 `json:"Reading2Max"`
+	Reading2Avg float64 `json:"Reading2Avg"`
+	Reading3Min float64 `json:"Reading3Min"`
+	Reading3Max float64 `json:"Reading3Max"`
+	Reading3Avg float64 `json:"Reading3Avg"`
 }
 
 // //////////////////////////// WEB SOCKET SECTION ///////////////////////////////////////
@@ -160,6 +175,89 @@ func executeQuery(query string) string {
 	return string(jsonData)
 }
 
+func executeQueryMinMaxReport(query string) string {
+
+	connStr := "postgres://admin:quest@questdb:8812/qdb?sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		log.Println("Open database error: " + err.Error())
+	}
+	defer db.Close()
+
+	// Ensure the connection is alive
+	err = db.Ping()
+	if err != nil {
+		log.Println("Failed to ping database: " + err.Error())
+	}
+
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		log.Println("Prepare query error: " + err.Error())
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query()
+	if err != nil {
+		log.Println("Execute query error: " + err.Error())
+	}
+	defer rows.Close()
+
+	dataList := []MinMaxData{}
+	for rows.Next() {
+
+		var serialNumber string
+		var timestamp string
+		var sensorType string
+		var reading1min float64
+		var reading1max float64
+		var reading1avg float64
+		var reading2min float64
+		var reading2max float64
+		var reading2avg float64
+		var reading3min float64
+		var reading3max float64
+		var reading3avg float64
+
+		// Scan the data into variables
+		if err := rows.Scan(&serialNumber, &sensorType, &reading1max, &reading1min, &reading1avg, &reading2max, &reading2min, &reading2avg, &reading3max, &reading3min, &reading3avg, &timestamp); err != nil {
+			log.Println("Failed to scan row: " + err.Error())
+		}
+
+		//add each record to a list to return
+		var data MinMaxData
+		data.Serial = serialNumber
+		data.Type = sensorType
+		data.Timestamp = timestamp
+		data.Reading1Min = reading1min
+		data.Reading1Max = reading1max
+		data.Reading1Avg = reading1avg
+
+		data.Reading2Min = reading2min
+		data.Reading2Max = reading2max
+		data.Reading2Avg = reading2avg
+
+		data.Reading3Min = reading3min
+		data.Reading3Max = reading3max
+		data.Reading3Avg = reading3avg
+
+		dataList = append(dataList, data)
+
+		// Check for any errors encountered during iteration
+		if err := rows.Err(); err != nil {
+			log.Println("Error during row iteration: " + err.Error())
+		}
+	}
+
+	// Convert the slice to JSON
+	jsonData, err := json.Marshal(dataList)
+	if err != nil {
+		log.Println("Failed to marshal data: " + err.Error())
+
+	}
+
+	return string(jsonData)
+}
+
 // Get all current sensors
 func getAllSensors(ctx *gin.Context) {
 
@@ -197,7 +295,48 @@ func getHistoricalData(ctx *gin.Context) {
 	ctx.String(http.StatusOK, result)
 }
 
-func insertSensorData(data SensorData) {
+// Get min, max and avg values
+func getMinMaxAvgData(ctx *gin.Context) {
+	query := `SELECT
+				serial_number,
+				sensor_type,
+				MAX(reading1) AS max_reading1,
+				MIN(reading1) AS min_reading1,
+				AVG(reading1) AS avg_reading1,
+				MAX(reading2) AS max_reading2,
+				MIN(reading2) AS min_reading2,
+				AVG(reading2) AS avg_reading2,
+				MAX(reading3) AS max_reading3,
+				MIN(reading3) AS min_reading3,
+				AVG(reading3) AS avg_reading3,
+				date_trunc('#PERIOD#', timestamp) AS period  -- Use date_trunc to bucket by hour
+			FROM
+				sensor_historical_data
+			WHERE
+				serial_number = '#SERIAL#'
+			GROUP BY
+				serial_number,
+				sensor_type,
+				period
+			ORDER BY
+				period;`
+
+	//Get sensor serial number and the date range
+	serial := ctx.Query("serial_number")
+	interval := ctx.Query("interval")
+
+	//modify query
+	query = strings.ReplaceAll(query, "#SERIAL#", serial)
+	query = strings.ReplaceAll(query, "#PERIOD#", interval)
+
+	fmt.Println(query)
+
+	result := executeQueryMinMaxReport(query)
+
+	ctx.String(http.StatusOK, result)
+}
+
+func insertSensorData(data Message) {
 
 	// Connect to QuestDB
 	ctx := context.TODO()
@@ -210,15 +349,15 @@ func insertSensorData(data SensorData) {
 	defer sender.Close(ctx)
 
 	// Create the row and insert into QuestDB
-	last_updated, _ := time.Parse(time.RFC3339, data.Timestamp)
+	last_updated, _ := time.Parse(time.RFC3339, data.Value.Data.Timestamp)
 	err = sender.
 		Table("sensor_historical_data").
-		Symbol("serial_number", data.Serial).
-		StringColumn("sensor_type", data.Type).
+		Symbol("serial_number", data.Value.Data.Serial).
+		StringColumn("sensor_type", data.Value.Data.Type).
 		TimestampColumn("timestamp", last_updated).
-		Float64Column("reading1", data.Reading1).
-		Float64Column("reading2", data.Reading2).
-		Float64Column("reading3", data.Reading3).
+		Float64Column("reading1", data.Value.Data.Reading1).
+		Float64Column("reading2", data.Value.Data.Reading2).
+		Float64Column("reading3", data.Value.Data.Reading3).
 		At(ctx, last_updated)
 
 	if err != nil {
@@ -239,44 +378,10 @@ func insertSensorData(data SensorData) {
 	//sender.Close(ctx)
 }
 
-// ///////////////////////////////// Other helper functions ///////////////////////////////////////
-// Get Kafka cluster id using Kafka REST Proxy instead of native client, just demonstrating its flexibility
-func getKafkaClusterID(url string) (string, error) {
-
-	//Send GET request
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-
-	defer resp.Body.Close()
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	// Get cluster id string from the json response
-	value := gjson.Get(string(body), "data.0.cluster_id")
-
-	return value.String(), nil
-}
-
-// Get an instance Kafka cluster ID based on URL
-func create_kafka_topic_and_subscribe(ctx *gin.Context) {
-
-	url := "http://kafka-rest-proxy:8082/v3/clusters"
-
-	//Get Kafka local cluster id using Kafka REST API proxy, demonstrating REST works as well
-	cluster_id, err := getKafkaClusterID(url)
-	if err != nil {
-		ctx.JSON(http.StatusOK, gin.H{"Status": "Server error, unable to get Kafka cluster id.", "Error": err.Error()})
-	}
-
-	// Get topic name from the post
-	topic := ctx.Query("topic_name")
-	broker := "kafka:9092"
+// Create a kafka topic and then call another method to subscribe to Kafka topic using native client
+func create_kafka_topic_then_subscribe(topic_name string) {
+	topic := topic_name
+	broker := "kafka:9093"
 	partitions := 1
 	replicationFactor := 1
 
@@ -290,7 +395,7 @@ func create_kafka_topic_and_subscribe(ctx *gin.Context) {
 	// Create a new admin client
 	conn, err := kafka.Dial("tcp", broker)
 	if err != nil {
-		ctx.JSON(http.StatusOK, gin.H{"status": "Connect to Kafka failed!", "error": err.Error()})
+		log.Println("Connect to Kafka failed! " + err.Error())
 	}
 	defer conn.Close()
 
@@ -301,24 +406,33 @@ func create_kafka_topic_and_subscribe(ctx *gin.Context) {
 		ReplicationFactor: replicationFactor,
 	})
 	if err != nil {
-		ctx.JSON(http.StatusOK, gin.H{"status": "Failed to create topic!", "error": err.Error()})
+		log.Println("Failed to create topic! " + err.Error())
 		return
 	}
 
-	//add path to url for creating publish message endpoint
-	new_url := strings.ReplaceAll(url, "kafka-rest-proxy", "localhost") + "/" + cluster_id + "/topics"
-
 	//Kafka topic is created, now start the listening for messages on this topic by subscribing to it
 	go subscribeToKafkaTopic(topic)
+}
 
-	//Return messages to user
-	ctx.JSON(http.StatusOK, gin.H{"Status": "OK", "Kafka_Endpoint": new_url + "/" + topic + "/records"})
+// Define the structure for the JSON data
+type Message struct {
+	Value struct {
+		Type string `json:"type"`
+		Data struct {
+			Serial    string  `json:"Serial"`
+			Type      string  `json:"Type"`
+			Timestamp string  `json:"Timestamp"`
+			Reading1  float64 `json:"Reading1"`
+			Reading2  float64 `json:"Reading2"`
+			Reading3  float64 `json:"Reading3"`
+		} `json:"data"`
+	} `json:"value"`
 }
 
 // Subscribe to Kafka
 func subscribeToKafkaTopic(topic_name string) {
 	// Define the Kafka broker addresses and topic
-	brokers := []string{"kafka:9092"}   // Replace with your Kafka broker addresses
+	brokers := []string{"kafka:9093"}   // Replace with your Kafka broker addresses
 	topic := topic_name                 // Replace with your topic name
 	groupID := topic_name + "-consumer" // Replace with your consumer group ID
 
@@ -351,46 +465,38 @@ func subscribeToKafkaTopic(topic_name string) {
 		broadcast <- []byte(rcv_msg)
 
 		// Parse the JSON data into a struct
-		var data SensorData
-		err = json.Unmarshal([]byte(rcv_msg), &data)
+		var kafka_msg Message
+		err = json.Unmarshal([]byte(rcv_msg), &kafka_msg)
 		if err != nil {
 			log.Println("Error unmarshalling JSON:" + err.Error())
 			return
 		}
 
-		// log.Println("Serial: " + data.Serial)
-		// log.Println("Type: " + data.Type)
-		// log.Print("LastUpdate: ")
-		// log.Println(data.Timestamp)
-		// log.Print("Value 1: ")
-		// log.Println(data.Reading1)
-		// log.Print("Value 2: ")
-		// log.Println(data.Reading2)
-		// log.Print("Value 3: ")
-		// log.Println(data.Reading3)
-
-		go insertSensorData(data)
+		// go routine insert the received data from kafka pipeline
+		go insertSensorData(kafka_msg)
 	}
 }
 
-// Main function, entry point
+// ///////////////////////////////////////// Main function, entry point ////////////////////////////////////////
 func main() {
-
 	server := gin.Default()
 
 	//Apply the CORS middleware
 	server.Use(cors.Default())
 
 	//REST GET endpoints
-	server.GET("/api/get_all_sensors", getAllSensors)                                     //connect to QuestDB to get all sensors info
-	server.GET("/api/get_sensor_historical_data", getHistoricalData)                      //connect to QuestDB to get historical data
-	server.GET("/api/create_kafka_topic_and_subscribe", create_kafka_topic_and_subscribe) //create kafka topic through Kafka rest api
+	server.GET("/api/get_all_sensors", getAllSensors)                //connect to QuestDB to get all sensors info
+	server.GET("/api/get_sensor_historical_data", getHistoricalData) //connect to QuestDB to get historical data
+	server.GET("/api/get_sensor_min_max_avg_data", getMinMaxAvgData) //connect to QuestDB to get historical data
 
 	// Set up WebSocket endpoint
 	server.GET("/ws", handleWebSocket)
 
 	// Start the broadcast goroutine, url is ws://localhost:8080/ws
 	go broadcastMessages()
+
+	// Create a topic and subcribe
+	create_kafka_topic_then_subscribe("sensor_data")
 
 	//Start the backend server listening on port 8080
 	log.Fatal(server.Run(":8080"))

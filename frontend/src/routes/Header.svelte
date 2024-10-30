@@ -26,6 +26,9 @@
 			<li aria-current={$page.url.pathname === '/tabular' ? 'page' : undefined}>
 				<a href="/tabular">Tabular</a>
 			</li>
+			<li aria-current={$page.url.pathname === '/minmax' ? 'page' : undefined}>
+				<a href="/minmax">Min/Max</a>
+			</li>
 			<li aria-current={$page.url.pathname === '/about' ? 'page' : undefined}>
 				<a href="/about">Project Reflections</a>
 			</li>			
