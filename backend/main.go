@@ -358,16 +358,16 @@ func subscribeToKafkaTopic(topic_name string) {
 			return
 		}
 
-		log.Println("Serial: " + data.Serial)
-		log.Println("Type: " + data.Type)
-		log.Print("LastUpdate: ")
-		log.Println(data.Timestamp)
-		log.Print("Value 1: ")
-		log.Println(data.Reading1)
-		log.Print("Value 2: ")
-		log.Println(data.Reading2)
-		log.Print("Value 3: ")
-		log.Println(data.Reading3)
+		// log.Println("Serial: " + data.Serial)
+		// log.Println("Type: " + data.Type)
+		// log.Print("LastUpdate: ")
+		// log.Println(data.Timestamp)
+		// log.Print("Value 1: ")
+		// log.Println(data.Reading1)
+		// log.Print("Value 2: ")
+		// log.Println(data.Reading2)
+		// log.Print("Value 3: ")
+		// log.Println(data.Reading3)
 
 		go insertSensorData(data)
 	}
