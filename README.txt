@@ -1,1 +1,0 @@
-Please refer to the folder "Guides and Instructions" for details .pdf steps on how to setup development environment in docker, and running this project locally.

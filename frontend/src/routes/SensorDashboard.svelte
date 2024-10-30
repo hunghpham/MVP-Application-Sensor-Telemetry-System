@@ -23,20 +23,12 @@
   let selectedSensorSerial = '';    
   let ws;
   
-  // Fetch data when the component is mounted
-  onMount(async () => {
-    if (typeof window !== 'undefined') {
-      // This code runs only in the browser
-      console.log('Running on the client side');
-    } else {
-      // This code runs on the server side (SSR)
-      console.log('Running on the server side');
-    }
-
-    fetchAllSensors();
-    generateChart();
+  // Perform all required task when on mount (page loaded)
+  onMount(async () => {    
+    fetchAllSensors();  //Fetch sensor data if exist
+    generateChart();    //Generate chart for selected sensor if done so
     
-    //Run every 20 seconds
+    //Run every 2 minutes
     run_int_fetchAllSensors = setInterval(()=> {handleRowClick(selectedSensorSerial)}, 120000);    
 
     //connect to the server using websocket
@@ -46,15 +38,16 @@
 		ws.onmessage = (event) => {
 			
       const jsonObject = JSON.parse(event.data);
-      console.log(jsonObject);
+      console.log(jsonObject);  //for debugging just print the sensor data coming from the websocket
             
+      //Got sensor data, fetch latest sensor reading from database and update the sensor array variable which cause Svelte reactive nature to update the html table automatically with the data 
       fetchAllSensors();
 
-      //Update the table, find the sensor and update it      
-      const sensor = sensors.find(sensor => sensor.Serial === jsonObject.Serial);     
+      //Find the sensor from the sensor array variable and check to see make sure the receive sensor data from the websocket is indeed a sensor currently exist   
+      //const sensor = sensors.find(sensor => sensor.Serial === jsonObject.Serial);     
       
-      //Update the chart
-      if (sensor.Serial === selectedSensorSerial) {
+      //Update the chart with this new data from the websocket if the user choose to monitor this sensor graphically as well
+      if (jsonObject.Serial === selectedSensorSerial) {
         //Create the new data point object for temperature
         const new_temp_data_point = {
           x: new Date(jsonObject.Timestamp), 
@@ -114,7 +107,6 @@
     chart.data.datasets[2].data.push(new_CO2_data_point);
     chart.update();
   }
-
 
   //Fetch historical data for a sensor
   async function fetchSensorHistoricalData(serial, start, end) {
@@ -319,12 +311,12 @@
     //Chart.js setup and configuration for line chart
     chart = new Chart(ctx, chart_config);
   }
-  
-</script>
+ 
  
 
+</script>
+ 
 <h1 class="text-4xl font-bold text-gray mb-4 p-5">Sensor Dashboard</h1>  
-
 
 <!-- <table class="w-full border-collapse mt-5 text-center dark:bg-gray-800"> -->
 <table class="w-full border-collapse mt-5 text-center rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 shadow-2xl">
@@ -364,9 +356,8 @@
   <canvas bind:this={chartCanvas} class="max-w-full h-[500px]"></canvas> 
 </div>
 
-<style>
 
-  
+<style>  
   /* table {
     width: 100%;
     border-collapse: collapse;
