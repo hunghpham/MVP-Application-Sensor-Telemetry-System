@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-resty/resty/v2"
+	"context"
+
+	"github.com/segmentio/kafka-go"
 	"github.com/tidwall/gjson"
 )
 
@@ -56,12 +58,12 @@ func main() {
 		fmt.Println("Error reading file:", err)
 	}
 
-	//Get post url, Kafka URL for posting sensor to a topic channel
-	post_url, err := getKafkaPublishURLEndpointandStartListener()
-	fmt.Println(post_url)
-	if err != nil {
-		fmt.Println("Unable to start Kafka Rest endpoint listener for sensor data!, try again!")
-	}
+	// //Get post url, Kafka URL for posting sensor to a topic channel
+	// post_url, err := getKafkaPublishURLEndpointandStartListener()
+	// fmt.Println(post_url)
+	// if err != nil {
+	// 	fmt.Println("Unable to start Kafka Rest endpoint listener for sensor data!, try again!")
+	// }
 
 	//splitStr := strings.Split(lines[0], "=")
 	//post_url := strings.TrimSpace(splitStr[1])
@@ -94,13 +96,8 @@ func main() {
 
 		time.Sleep(time.Second * 2)
 
-		go postSensorInfo(serial, "Incubator", post_url, randomInt)
+		go postSensorInfo(serial, "Incubator", randomInt)
 	}
-
-	// fmt.Println(list_of_sensors)
-	// fmt.Println(post_url)
-	// fmt.Println(number_of_sensors)
-	// fmt.Println(serial_characters)
 
 	for {
 		time.Sleep(time.Hour)
@@ -132,10 +129,18 @@ func getKafkaPublishURLEndpointandStartListener() (string, error) {
 }
 
 // post sensor information
-func postSensorInfo(serial string, sensor_type string, post_url string, delay_interval int) {
+func postSensorInfo(serial string, sensor_type string, delay_interval int) {
 
 	// Initialize an empty Payload struct
 	var payload Payload
+
+	// Define Kafka writer configuration
+	writer := kafka.NewWriter(kafka.WriterConfig{
+		Brokers:  []string{"localhost:9092"},
+		Topic:    "sensor_data",
+		Balancer: &kafka.LeastBytes{},
+	})
+	defer writer.Close()
 
 	//Keep looping
 	for {
@@ -176,20 +181,19 @@ func postSensorInfo(serial string, sensor_type string, post_url string, delay_in
 		jsonString := string(jsonData)
 		fmt.Println("JSON String:", jsonString)
 
-		client := resty.New()
-
-		// Send a POST request
-		resp, err := client.R().
-			SetHeader("Content-Type", "application/json").
-			SetBody(jsonString).
-			Post(post_url) // Kafka endpoint for posting messages
-		if err != nil {
-			log.Println("Failed to send request: " + err.Error())
+		// Define message
+		message := kafka.Message{
+			Value: []byte(jsonString),
 		}
 
-		// Print response details
-		log.Println("Response Status Code:", resp.StatusCode())
-		log.Println("Response Body:", resp.String())
+		// Write message to Kafka
+		err = writer.WriteMessages(context.Background(), message)
+		if err != nil {
+			log.Println("failed to write message to Kafka: " + err.Error())
+			continue
+		}
+
+		log.Println("Message published successfully")
 
 		time.Sleep(time.Duration(delay_interval) * time.Second)
 	}

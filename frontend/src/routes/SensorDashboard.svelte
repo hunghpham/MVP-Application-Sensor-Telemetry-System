@@ -47,23 +47,23 @@
       //const sensor = sensors.find(sensor => sensor.Serial === jsonObject.Serial);     
       
       //Update the chart with this new data from the websocket if the user choose to monitor this sensor graphically as well
-      if (jsonObject.Serial === selectedSensorSerial) {
+      if (jsonObject.value.data.Serial === selectedSensorSerial) {
         //Create the new data point object for temperature
         const new_temp_data_point = {
-          x: new Date(jsonObject.Timestamp), 
-          y: jsonObject.Reading1
+          x: new Date(jsonObject.value.data.Timestamp), 
+          y: jsonObject.value.data.Reading1
         };
 
         //Create the new data point object for humidity
         const new_hum_data_point = {
-          x: new Date(jsonObject.Timestamp), 
-          y: jsonObject.Reading2
+          x: new Date(jsonObject.value.data.Timestamp), 
+          y: jsonObject.value.data.Reading2
         };
 
         //Create the new data point object for CO2
         const new_CO2_data_point = {
-          x: new Date(jsonObject.Timestamp), 
-          y: jsonObject.Reading3
+          x: new Date(jsonObject.value.data.Timestamp), 
+          y: jsonObject.value.data.Reading3
         };
 
         updateChart(new_temp_data_point, new_hum_data_point, new_CO2_data_point);

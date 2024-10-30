@@ -1,21 +1,4 @@
-services:
-  go-dev:
-    image: golang:1.23.1-alpine3.20
-    volumes:
-      - ./backend:/app
-    working_dir: /app
-
-  backend:
-    build: ./backend
-    ports:
-      - "8080:8080"
-    depends_on:
-      - kafka
-      - questdb
-    environment:
-      KAFKA_BROKERS: kafka:9092
-      QUESTDB_URL: questdb:9000
-
+services:  
   frontend:
     image: node:alpine
     ports:
@@ -35,40 +18,28 @@ services:
     ports:
       - "2181:2181"
     volumes:
-      - zookeeper_data:/var/lib/zookeeper #persist zookeeper data
-    
-
+      - zookeeper_data:/var/lib/zookeeper #persist zookeeper data       
+   
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
+      - "9092:9092"  # For publishing messages
+      - "9093:9093"  # For subscribing messages
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://kafka:29092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_PUBLISH://localhost:9092,PLAINTEXT_SUBSCRIBE://kafka:9093,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENERS: PLAINTEXT_PUBLISH://0.0.0.0:9092,PLAINTEXT_SUBSCRIBE://0.0.0.0:9093,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_PUBLISH:PLAINTEXT,PLAINTEXT_SUBSCRIBE:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_LOG_RETENTION_HOURS: -1              # Infinite retention
       KAFKA_LOG_RETENTION_BYTES: -1              # No size limit for retention
     volumes:
-      - kafka_data:/var/lib/kafka
+      - kafka_data:/var/lib/kafka 
     
-
-  kafka-rest-proxy:
-    image: confluentinc/cp-kafka-rest:7.4.0
-    depends_on:
-      - kafka
-    ports:
-      - "8082:8082"
-    environment:
-      KAFKA_REST_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:29092"
-      KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
-    
-
   questdb:
     image: questdb/questdb:latest
     container_name: questdb
@@ -77,7 +48,26 @@ services:
     environment:      
       - QUESTDB_WAL_ENABLED=true  # Enable WAL
     volumes:
-      - questdb_data:/var/lib/questdb    
+      - questdb_data:/var/lib/questdb 
+ 
+
+  go-dev:
+    image: golang:1.23.1-alpine3.20
+    volumes:
+      - ./backend:/app
+    working_dir: /app
+  
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka                
+      - questdb                
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      QUESTDB_URL: questdb:9000
        
 volumes:
   zookeeper_data:

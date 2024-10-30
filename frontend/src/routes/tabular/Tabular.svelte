@@ -94,15 +94,15 @@
       pastDate = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();                          
     }
     else if (range == "1 day") {            
-      // Get the past date by hour
+      // Get the past date by day
       pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();                          
     }
     else if (range == "1 week") {
-      // Get the past date by hour
+      // Get the past date by week
       pastDate = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();        
     }
     else {
-      // Get the past date by hour
+      // Get the past date by month
       pastDate = new Date(Date.now() - 744 * 60 * 60 * 1000).toISOString();        
     }
 
