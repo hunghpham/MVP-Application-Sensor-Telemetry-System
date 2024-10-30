@@ -268,7 +268,6 @@
     chart = new Chart(ctx, chart_config);
   }
 
-
   // Handle time range button clicks
   function setTimeRange(range) {
     console.log(`Time range set to: ${range}`);
@@ -299,8 +298,10 @@
 
     //get historical data based on date range
     fetchSensorHistoricalData(selectedSensor, currentDate, pastDate);    
-  }
+  }  
 </script>
+
+
 
 <h1 class="text-4xl font-bold text-gray mb-4 p-5">Historical Graph</h1>  
 
