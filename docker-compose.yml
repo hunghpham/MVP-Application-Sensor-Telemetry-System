@@ -20,45 +20,6 @@ services:
     volumes:
       - zookeeper_data:/var/lib/zookeeper #persist zookeeper data       
    
-  # kafka:
-  #   image: confluentinc/cp-kafka:7.4.0
-  #   depends_on:
-  #     - zookeeper
-  #   ports:
-  #     - "9092:9092"  # For publishing messages
-  #     - "9093:9093"  # For subscribing messages
-  #   environment:
-  #     KAFKA_BROKER_ID: 1
-  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_PUBLISH://kafka:9092,PLAINTEXT_SUBSCRIBE://kafka:9093,PLAINTEXT_INTERNAL://kafka:29092
-  #     KAFKA_LISTENERS: PLAINTEXT_PUBLISH://0.0.0.0:9092,PLAINTEXT_SUBSCRIBE://0.0.0.0:9093,PLAINTEXT_INTERNAL://0.0.0.0:29092
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_PUBLISH:PLAINTEXT,PLAINTEXT_SUBSCRIBE:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-  #     KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
-  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  #     KAFKA_LOG_RETENTION_HOURS: -1              # Infinite retention
-  #     KAFKA_LOG_RETENTION_BYTES: -1              # No size limit for retention
-  #   volumes:
-  #     - kafka_data:/var/lib/kafka 
-
-  # kafka:
-  #   image: confluentinc/cp-kafka:7.4.0
-  #   depends_on:
-  #     - zookeeper
-  #   ports:
-  #     - "9092:9092"  # Single port for both publishing and subscribing messages
-  #   environment:
-  #     KAFKA_BROKER_ID: 1
-  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-  #     KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-  #     KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  #     KAFKA_LOG_RETENTION_HOURS: -1              # Infinite retention
-  #     KAFKA_LOG_RETENTION_BYTES: -1              # No size limit for retention
-  #   volumes:
-  #     - kafka_data:/var/lib/kafka
-
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     depends_on:

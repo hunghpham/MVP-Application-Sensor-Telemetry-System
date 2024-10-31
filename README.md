@@ -79,14 +79,16 @@ This project adopts a modular design and a different architectural approach, ser
 1. **Run The Project With Docker Only**
     1. Please run the Docker Desktop application
     2. If the OS is Windows, open Command Prompt or Windows power shell. If using other OS, use their terminal shell application
-    3. Navigate in to where the folder of the project "MVP-Application-Sensor_Telemetry-System", the root of the project
+    3. Navigate in to where the folder of the project "MVP-Application-Sensor_Telemetry-System", the root of the project.  You can either clone the project like shown in "Clone the MVP repository" or you can download the latest release source code.
     4. Run the docker command: `docker compose run --entrypoint="" frontend npm install`
     5. Wait until the installation of node modules are complete, it can take up to 5 minutes, since node modules is quite large
-    6. Run the docker command: `docker compose up --build`
-    7. Open a browser and enter the url: http://localhost:3000
-    8. As the docker images are being built, keep waiting and the application will start up with simulation sensor data flowing through, you can hit the refresh button on the browser if your browser is caching something. 
+    6. Run the docker command: `docker compose build`
+    8. In the Docker Desktop application a container is created with the MVP project name under "Containers", you can click the play button under "Actions" to start the docker container.
+       ![MVP Dashboard](image-6.png)     
+    9. Open a browser and enter the url: http://localhost:3000
+    10. As the docker images are being spin up, keep waiting and the application will start up with simulation sensor data flowing through, you can hit the refresh button on the browser if your browser is caching something. 
        ![MVP Dashboard](image-5.png) 
-    9. Done, you can now use the MVP application
+    11. Done, you can now use the MVP application
 
 2. **Run The Project For Development**
     1. Please run the Docker Desktop application
@@ -95,8 +97,8 @@ This project adopts a modular design and a different architectural approach, ser
     4. Open a terminal in VS Code
     5. Run the docker command: `docker compose run --entrypoint="" frontend npm install`
     6. Wait until the installation of node modules are complete, it can take up to 5 minutes, since node modules is quite large
-    7. Run the docker command: `docker compose up --build`
-    8. Open a browser and enter the url: http://localhost:3000
+    7. Run the docker command: `docker compose up --build` or `docker compose build` if you don't want to run the docker services yet
+    8. If you ran the command `docker compose up --build`, open a browser and enter the url: http://localhost:3000
     9. As the docker images are being built, keep waiting and the application will start up with simulation sensor data flowing through, you can hit the refresh button on the browser if your browser is caching something.
        ![MVP Dashboard](image-5.png) 
     10. Done, you can now start developing with the MVP project
