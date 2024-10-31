@@ -98,7 +98,7 @@ This project adopts a modular design and a different architectural approach, ser
     5. Run the docker command: `docker compose run --entrypoint="" frontend npm install`
     6. Wait until the installation of node modules are complete, it can take up to 5 minutes, since node modules is quite large
     7. Run the docker command: `docker compose up --build` or `docker compose build` if you don't want to run the docker services yet
-    8. Open a browser and enter the url: http://localhost:3000
+    8. If you ran the command `docker compose up --build`, open a browser and enter the url: http://localhost:3000
     9. As the docker images are being built, keep waiting and the application will start up with simulation sensor data flowing through, you can hit the refresh button on the browser if your browser is caching something.
        ![MVP Dashboard](image-5.png) 
     10. Done, you can now start developing with the MVP project
