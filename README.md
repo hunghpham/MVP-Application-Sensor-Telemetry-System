@@ -83,6 +83,7 @@ This project adopts a modular design and a different architectural approach, ser
     4. Run the docker command: `docker compose run --entrypoint="" frontend npm install`
     5. Wait until the installation of node modules are complete, it can take up to 5 minutes, since node modules is quite large
     6. Run the docker command: `docker compose build`
+    7. Run the docker command: `docker compose up`
     8. In the Docker Desktop application a container is created with the MVP project name under "Containers", you can click the play button under "Actions" to start the docker container.
        ![MVP Dashboard](image-6.png)     
     9. Open a browser and enter the url: http://localhost:3000
