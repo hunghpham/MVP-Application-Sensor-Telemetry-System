@@ -124,10 +124,10 @@
     {/each}
   </select>
 
-  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 hour')}>1 hour</button>
-  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 day')}>1 day</button>
-  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 week')}>1 week</button>
-  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 month')}>1 month</button>
+  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 hour')}>Hourly</button>
+  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 day')}>Daily</button>
+  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 week')}>Weekly</button>
+  <button class="bg-gray-600 text-white border-none cursor-pointer rounded-md transition-colors duration-300 hover:bg-gray-500 m-2 p-2 text-lg shadow-2xl" on:click={() => setTimeRange('1 month')}>Monthly</button>
 </div>
 
 

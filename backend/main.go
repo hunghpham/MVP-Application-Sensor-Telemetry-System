@@ -381,7 +381,7 @@ func insertSensorData(data Message) {
 // Create a kafka topic and then call another method to subscribe to Kafka topic using native client
 func create_kafka_topic_then_subscribe(topic_name string) {
 	topic := topic_name
-	broker := "kafka:9093"
+	broker := "kafka:9092"
 	partitions := 1
 	replicationFactor := 1
 
@@ -392,10 +392,29 @@ func create_kafka_topic_then_subscribe(topic_name string) {
 	})
 	defer writer.Close()
 
-	// Create a new admin client
-	conn, err := kafka.Dial("tcp", broker)
-	if err != nil {
-		log.Println("Connect to Kafka failed! " + err.Error())
+	var conn *kafka.Conn
+	var err error
+
+	// Retry connecting to Kafka until successful
+	for {
+		conn, err = kafka.Dial("tcp", broker)
+		if err != nil {
+			log.Println("Connect to Kafka failed! Retrying... " + err.Error())
+			time.Sleep(2 * time.Second) // Wait for 2 seconds before retrying
+			continue
+		}
+
+		// Check if the Kafka connection is responsive by fetching broker metadata
+		_, err = conn.Brokers()
+		if err != nil {
+			log.Println("Kafka connection established, but failed to retrieve broker metadata. Retrying... " + err.Error())
+			conn.Close()
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		log.Println("Connected to Kafka successfully and broker is responsive.")
+		break
 	}
 	defer conn.Close()
 
@@ -432,9 +451,9 @@ type Message struct {
 // Subscribe to Kafka
 func subscribeToKafkaTopic(topic_name string) {
 	// Define the Kafka broker addresses and topic
-	brokers := []string{"kafka:9093"}   // Replace with your Kafka broker addresses
-	topic := topic_name                 // Replace with your topic name
-	groupID := topic_name + "-consumer" // Replace with your consumer group ID
+	brokers := []string{"kafka:9092"}
+	topic := topic_name
+	groupID := topic_name + "-consumer"
 
 	// Set up the Kafka reader (consumer)
 	reader := kafka.NewReader(kafka.ReaderConfig{
@@ -496,7 +515,7 @@ func main() {
 	go broadcastMessages()
 
 	// Create a topic and subcribe
-	create_kafka_topic_then_subscribe("sensor_data")
+	go create_kafka_topic_then_subscribe("sensor_data")
 
 	//Start the backend server listening on port 8080
 	log.Fatal(server.Run(":8080"))
