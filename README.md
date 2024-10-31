@@ -49,7 +49,7 @@ This project adopts a modular design and a different architectural approach, ser
     2. Ensure you set your machine to enable Virtualization.  To verify on Windows, open Task Manager, under Performance tab, you should see "Virtualization: Enabled" as shown below:
        ![System Virtualization](image-2.png)
     3. Install Docker Desktop using the file you just downloaded.  On Windows OS, when ask if you want to use Hyper V or WSL, choose WSL.
-    4. If your operating system is Windows, run Docker Desktop when it finished installing. Then, go to Settings->Resources-WSL Integration, and enable integration for WSL distro, in our case it's Ubuntu as shown below:
+    4. If your operating system is Windows, run Docker Desktop when it finished installing. Then, go to "Settings", then choose "Resources", select WSL Integration, and check the box "enable integration for WSL distro"
        ![Enable WSL Integration](image-3.png)
     5. Restart your computer
 
@@ -95,7 +95,7 @@ This project adopts a modular design and a different architectural approach, ser
     4. Open a terminal in VS Code
     5. Run the docker command: `docker compose run --entrypoint="" frontend npm install`
     6. Wait until the installation of node modules are complete, it can take up to 5 minutes, since node modules is quite large
-    7. Run the dokcer command: `docker compose up --build`
+    7. Run the docker command: `docker compose up --build`
     8. Open a browser and enter the url: http://localhost:3000
     9. As the docker images are being built, keep waiting and the application will start up with simulation sensor data flowing through, you can hit the refresh button on the browser if your browser is caching something.
        ![MVP Dashboard](image-5.png) 
