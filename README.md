@@ -1,4 +1,4 @@
-# Minimal Viable Product (Sensor Data Acquistion)
+# Minimal Viable Product (Sensor Data Telemetry)
 
 This project adopts a modular design and a different architectural approach, serving as a proof of concept applicable to both current and future software products at Mesa. It will ingest sensor data from external sources, store and process that data to generate reports, and display the information in real-time.
     -Golang programming language
